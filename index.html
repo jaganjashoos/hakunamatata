@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HakunaMatata - Synchronized Watch Party & Live Lounge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#38bdf8',
+              500: '#06b6d4',
+              600: '#0891b2',
+            },
+            theater: {
+              950: '#030712',
+              900: '#0b0f19',
+              850: '#111827',
+              800: '#1f2937'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    /* Cinema Glow effect */
+    .ambient-glow {
+      box-shadow: 0 0 50px -10px rgba(6, 182, 212, 0.15);
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased bg-theater-950 text-slate-100 overflow-hidden select-none">
+
+  <!-- TOP NAVBAR -->
+  <header class="bg-theater-900 border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between z-20 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white font-bold p-2 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+        <i class="fa-solid fa-clapperboard text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-black text-xl tracking-wider text-white flex items-center gap-1.5">
+          Hakuna<span class="text-cyan-400">Matata</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/60">LIVE</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- Active Room Badge & Controls -->
+    <div id="roomBadge" class="hidden items-center bg-theater-850 border border-slate-800 rounded-full px-3 py-1 space-x-2 sm:space-x-3 text-xs">
+      <span class="inline-flex items-center font-medium text-emerald-400">
+        <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+        <span class="hidden sm:inline">Room</span>
+      </span>
+      <div class="h-3.5 w-px bg-slate-800"></div>
+      <div class="flex items-center space-x-1.5">
+        <span class="text-slate-400 hidden sm:inline">Code:</span>
+        <span id="displayRoomCode" class="font-mono font-bold text-cyan-400 tracking-wider">------</span>
+        <button onclick="copyRoomCode()" title="Copy Room Code" class="text-slate-400 hover:text-white transition p-1">
+          <i class="fa-regular fa-copy"></i>
+        </button>
+      </div>
+      <div class="h-3.5 w-px bg-slate-800"></div>
+      <!-- Auto Cleanup Timeout Badge -->
+      <span class="hidden md:inline-flex items-center text-[10px] text-amber-400/90 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/50" title="Rooms without active members auto-delete to prevent server clutter">
+        <i class="fa-solid fa-broom text-[9px] mr-1"></i> Auto-Cleanup (30m)
+      </span>
+      <div class="h-3.5 w-px bg-slate-800 hidden md:block"></div>
+      <button onclick="leaveRoom()" class="font-semibold text-rose-400 hover:text-rose-300 transition flex items-center gap-1">
+        <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Leave</span>
+      </button>
+    </div>
+
+    <!-- Mobile View Tabs Switcher & Profile -->
+    <div class="flex items-center space-x-2">
+      <!-- Mobile Drawer Switch Button (Only visible on small screens) -->
+      <button id="mobileTabToggle" onclick="toggleMobileView()" class="lg:hidden bg-slate-800 border border-slate-700 text-cyan-400 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+        <i class="fa-solid fa-comments"></i>
+        <span id="mobileTabLabel">Chat & Call</span>
+      </button>
+
+      <!-- Clickable User Profile Badge to Change Name -->
+      <button onclick="toggleProfileModal()" class="flex items-center space-x-2 bg-theater-850 hover:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-800 hover:border-cyan-500/50 transition group cursor-pointer" title="Click to edit profile name">
+        <div id="userAvatar" class="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 flex items-center justify-center font-bold text-xs text-white uppercase group-hover:scale-105 transition">
+          U
+        </div>
+        <span id="displayUsername" class="text-xs font-medium text-slate-200 max-w-[80px] sm:max-w-[120px] truncate">Guest</span>
+        <i class="fa-solid fa-pen-to-square text-[10px] text-slate-500 group-hover:text-cyan-400 transition"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 relative flex overflow-hidden">
+
+    <!-- LANDING / ROOM JOIN MODAL (OVERLAY WHEN NOT IN ROOM) -->
+    <div id="joinModal" class="absolute inset-0 bg-theater-950/95 backdrop-blur-md z-30 flex items-center justify-center p-4">
+      <div class="bg-theater-900 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl ambient-glow">
+        <div class="text-center mb-6">
+          <div class="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 text-3xl mb-3">
+            <i class="fa-solid fa-film"></i>
+          </div>
+          <h2 class="text-2xl font-black text-white tracking-wide">HakunaMatata Lounge</h2>
+          <p class="text-slate-400 text-xs mt-1">Experience theater-style movie sync, WebRTC file streaming, voice chat, and live interaction with friends.</p>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Username Input -->
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Display Nickname</label>
+            <input type="text" id="inputUsername" placeholder="e.g. CinemaFan" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button onclick="createRoom()" class="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-cyan-500/20 transition active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-plus"></i> Create Room
+            </button>
+            <button onclick="toggleJoinInput()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl border border-slate-700 transition active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-door-open"></i> Join Room
+            </button>
+          </div>
+
+          <!-- Room Code Input Section -->
+          <div id="joinCodeSection" class="hidden pt-3 border-t border-slate-800 space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Enter 6-Digit Room Code</label>
+              <input type="text" id="inputRoomCode" max="6" placeholder="123456" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-center font-mono text-lg font-bold text-cyan-400 placeholder-slate-700 focus:outline-none focus:border-cyan-500 transition uppercase tracking-widest">
+            </div>
+            <button onclick="joinRoomByCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg transition active:scale-95 text-xs uppercase tracking-wider">
+              Confirm & Join Lounge
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP SCREEN (RESPONSIVE: SIDE BY SIDE OR MOBILE DRAWERS) -->
+    <div class="flex-1 flex flex-col lg:flex-row w-full h-full overflow-hidden">
+
+      <!-- LEFT SECTION: THEATER VIDEO PLAYER & CONTROLS -->
+      <div id="videoSection" class="flex-1 flex flex-col bg-theater-950 overflow-y-auto h-full">
+        
+        <!-- Cinema Screen Box -->
+        <div class="relative w-full bg-black flex-1 flex flex-col items-center justify-center min-h-[250px] p-2 sm:p-4 ambient-glow">
+          <div class="relative w-full max-w-6xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-900 flex items-center justify-center">
+            <!-- HTML5 Video Player -->
+            <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" controls crossorigin="anonymous">
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" type="video/mp4">
+              Your browser does not support HTML5 video.
+            </video>
+
+            <!-- YouTube Iframe Embed Fallback Container -->
+            <iframe id="ytPlayer" class="w-full h-full border-0 hidden" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+            <!-- Sync Overlay Status Badge -->
+            <div id="syncBadge" class="absolute top-4 left-4 bg-theater-950/90 backdrop-blur-md border border-cyan-500/30 px-3 py-1.5 rounded-full text-xs font-semibold text-cyan-300 opacity-0 transition-opacity duration-300 flex items-center gap-2 pointer-events-none z-10 shadow-lg">
+              <i class="fa-solid fa-rotate text-cyan-400 animate-spin"></i>
+              <span id="syncStatusText">Synced with Lounge</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Movie Selector & Media Controls Bar -->
+        <div class="p-4 bg-theater-900 border-t border-slate-800/80 space-y-3 shrink-0">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="currentMovieTitle" class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-film text-cyan-400"></i> Tears of Steel (Demo)
+              </h2>
+              <p class="text-[11px] text-slate-400">Upload a file to live stream it to all connected room members via WebRTC P2P sharing!</p>
+            </div>
+
+            <!-- Upload / Library Buttons -->
+            <div class="flex items-center space-x-2">
+              <label class="cursor-pointer bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-cloud-arrow-up text-white"></i> Share Local Movie (Broadcast to All)
+                <input type="file" id="localVideoInput" accept="video/*" class="hidden" onchange="handleFileUpload(event)">
+              </label>
+              <button onclick="toggleCatalogModal()" class="bg-theater-850 hover:bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-photo-film text-amber-400"></i> Presets
+              </button>
+            </div>
+          </div>
+
+          <!-- Media Link URL Bar -->
+          <div class="flex items-center space-x-2 bg-slate-950 p-2 rounded-xl border border-slate-800/80">
+            <i class="fa-solid fa-link text-slate-500 pl-2 text-xs"></i>
+            <input type="text" id="videoUrlInput" placeholder="Paste YouTube link or direct MP4/WebM URL..." class="bg-transparent flex-1 text-xs text-white placeholder-slate-600 focus:outline-none">
+            <button onclick="loadCustomUrl()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+              Load Movie
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT SECTION: CHAT & VOICE/VIDEO SIDEBAR (RESPONSIVE) -->
+      <div id="sideSection" class="hidden lg:flex w-full lg:w-96 bg-theater-900 border-l border-slate-800 flex-col h-full shrink-0">
+
+        <!-- VOICE CALL PANEL (AUDIO ONLY) -->
+        <div class="p-3 bg-theater-850 border-b border-slate-800 shrink-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-microphone-lines text-cyan-400"></i> Voice Lounge
+            </span>
+            <span id="participantCount" class="text-[11px] text-cyan-400 font-semibold bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-800/50">1 Connected</span>
+          </div>
+
+          <!-- Audio Participants Grid -->
+          <div id="voiceGrid" class="grid grid-cols-2 gap-2 mb-2">
+            <!-- User Self Audio Card -->
+            <div class="relative bg-theater-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center space-x-2.5">
+              <div id="userAvatarBox" class="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
+                U
+              </div>
+              <div class="flex-1 min-w-0">
+                <p id="localAudioName" class="text-xs font-semibold text-slate-200 truncate">You (Host)</p>
+                <p id="selfMicLabel" class="text-[10px] text-slate-500">Muted</p>
+              </div>
+              <span id="selfMicStatus" class="w-6 h-6 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full flex items-center justify-center text-[10px] shrink-0">
+                <i class="fa-solid fa-microphone-slash"></i>
+              </span>
+            </div>
+          </div>
+
+          <!-- Audio Call Controls -->
+          <div class="flex items-center justify-between space-x-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+            <button id="toggleMicBtn" onclick="toggleMic()" class="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center gap-2 text-xs font-semibold transition" title="Toggle Mic">
+              <i class="fa-solid fa-microphone-slash text-rose-400"></i>
+              <span id="micBtnText">Unmute Mic</span>
+            </button>
+            <button onclick="simulateAddPeer()" class="bg-cyan-950 text-cyan-400 hover:bg-cyan-900 border border-cyan-800/80 px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Simulate a friend joining your voice lounge to test audio room UI">
+              <i class="fa-solid fa-user-plus text-xs"></i>
+              <span class="hidden sm:inline">Add Test User</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- CHATROOM MESSAGES AREA -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="px-4 py-2 border-b border-slate-800 bg-theater-900 flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-comments text-cyan-400"></i> Live Chat
+            </span>
+          </div>
+
+          <!-- Message History -->
+          <div id="chatMessages" class="flex-1 p-3 overflow-y-auto space-y-2.5 text-xs">
+            <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5 text-slate-400 text-[11px]">
+              <i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i>
+              Welcome to HakunaMatata! Playback state & video files sync automatically across all users.
+            </div>
+          </div>
+
+          <!-- Message Input Box -->
+          <div class="p-2.5 bg-theater-900 border-t border-slate-800">
+            <form onsubmit="sendChatMessage(event)" class="flex items-center space-x-2">
+              <input type="text" id="chatInput" placeholder="Send message to theater..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition">
+              <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-white p-2 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-paper-plane text-xs px-1"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- PRESET CATALOG MODAL -->
+  <div id="catalogModal" class="fixed inset-0 bg-theater-950/90 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-theater-900 border border-slate-800 rounded-2xl p-6 max-w-xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-film text-cyan-400"></i> Cinema Presets
+        </h3>
+        <button onclick="toggleCatalogModal()" class="text-slate-400 hover:text-white text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto pr-1">
+        <!-- Preset Item 1 -->
+        <button onclick="selectPresetMovie('Tears of Steel (Sci-Fi)', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4')" class="bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl text-left transition group">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold group-hover:bg-cyan-500 group-hover:text-white transition">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-white group-hover:text-cyan-400 transition">Tears of Steel</p>
+              <p class="text-[10px] text-slate-500">Open-source Sci-Fi Short</p>
+            </div>
+          </div>
+        </button>
+
+        <!-- Preset Item 2 -->
+        <button onclick="selectPresetMovie('Sintel (Fantasy)', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4')" class="bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl text-left transition group">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold group-hover:bg-amber-500 group-hover:text-white transition">
+              <i class="fa-solid fa-dragon"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-white group-hover:text-amber-400 transition">Sintel</p>
+              <p class="text-[10px] text-slate-500">Fantasy Animation</p>
+            </div>
+          </div>
+        </button>
+
+        <!-- Preset Item 3 -->
+        <button onclick="selectPresetMovie('Big Buck Bunny', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4')" class="bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl text-left transition group">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold group-hover:bg-emerald-500 group-hover:text-white transition">
+              <i class="fa-solid fa-paw"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-white group-hover:text-emerald-400 transition">Big Buck Bunny</p>
+              <p class="text-[10px] text-slate-500">Classic Animated Short</p>
+            </div>
+          </div>
+        </button>
+
+        <!-- Preset Item 4 -->
+        <button onclick="selectPresetMovie('Elephant Dream', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4')" class="bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl text-left transition group">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold group-hover:bg-purple-500 group-hover:text-white transition">
+              <i class="fa-solid fa-gears"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-white group-hover:text-purple-400 transition">Elephant Dream</p>
+              <p class="text-[10px] text-slate-500">Surreal Sci-Fi</p>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT PROFILE / NICKNAME MODAL -->
+  <div id="profileModal" class="fixed inset-0 bg-theater-950/90 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-theater-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-cyan-400"></i> Edit Profile Name
+        </h3>
+        <button onclick="toggleProfileModal()" class="text-slate-400 hover:text-white text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">New Display Nickname</label>
+          <input type="text" id="editUsernameInput" placeholder="Enter new name..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition">
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button onclick="toggleProfileModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 px-4 rounded-xl text-xs transition">
+            Cancel
+          </button>
+          <button onclick="saveProfileName()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded-xl text-xs transition shadow-lg shadow-cyan-500/20">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2.5 translate-y-20 opacity-0 transition-all duration-300 z-50 text-xs">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastMsg" class="font-medium">Notification message</span>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // Global State Variables
+    let currentRoomCode = null;
+    let username = "Guest";
+    let channel = null;
+    let isBroadcastingInternal = false;
+    let localStream = null;
+    let isMicOn = false;
+    let simulatedPeers = [];
+    let isMobileChatOpen = false;
+
+    // WebRTC Peer-to-Peer Movie Streaming Engine
+    let peerConnections = {};
+    let localFileStream = null;
+    let isStreamHost = false;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    // Room Inactivity Auto-Cleanup Tracker (30 Minutes)
+    let lastActivityTimestamp = Date.now();
+    let roomCleanupTimer = null;
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+
+    const mainVideo = document.getElementById('mainVideo');
+
+    // Video Event Listeners for Real-time Synchronization
+    mainVideo.addEventListener('play', () => {
+      recordRoomActivity();
+      if (isBroadcastingInternal || !currentRoomCode) return;
+      broadcastStateChange({
+        type: 'PLAY',
+        currentTime: mainVideo.currentTime,
+        sender: username
+      });
+    });
+
+    mainVideo.addEventListener('pause', () => {
+      recordRoomActivity();
+      if (isBroadcastingInternal || !currentRoomCode) return;
+      broadcastStateChange({
+        type: 'PAUSE',
+        currentTime: mainVideo.currentTime,
+        sender: username
+      });
+    });
+
+    mainVideo.addEventListener('seeked', () => {
+      recordRoomActivity();
+      if (isBroadcastingInternal || !currentRoomCode) return;
+      broadcastStateChange({
+        type: 'SEEK',
+        currentTime: mainVideo.currentTime,
+        sender: username
+      });
+    });
+
+    // Room Inactivity Monitor Logic
+    function recordRoomActivity() {
+      lastActivityTimestamp = Date.now();
+    }
+
+    function startRoomAutoCleanupMonitor() {
+      stopRoomAutoCleanupMonitor();
+      lastActivityTimestamp = Date.now();
+
+      roomCleanupTimer = setInterval(() => {
+        if (!currentRoomCode) return;
+        const idleDuration = Date.now() - lastActivityTimestamp;
+        if (idleDuration >= INACTIVITY_TIMEOUT_MS) {
+          autoDeleteInactiveRoom();
+        }
+      }, 30000);
+    }
+
+    function stopRoomAutoCleanupMonitor() {
+      if (roomCleanupTimer) {
+        clearInterval(roomCleanupTimer);
+        roomCleanupTimer = null;
+      }
+    }
+
+    function autoDeleteInactiveRoom() {
+      const deletedCode = currentRoomCode;
+      addSystemChatMessage(`[SERVER CLEANUP] Room #${deletedCode} was auto-deleted due to inactivity.`);
+      showToast(`Room #${deletedCode} auto-deleted (Server Protection)`, 'error');
+      
+      broadcastStateChange({
+        type: 'ROOM_DELETED',
+        reason: 'Inactivity auto-cleanup',
+        sender: 'System'
+      });
+
+      leaveRoom();
+    }
+
+    // Room Entry & Exit Functions
+    function createRoom() {
+      setupUsername();
+      currentRoomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      enterRoom(currentRoomCode);
+      showToast(`Created Lounge Room #${currentRoomCode}`);
+    }
+
+    function toggleJoinInput() {
+      const section = document.getElementById('joinCodeSection');
+      section.classList.toggle('hidden');
+    }
+
+    function joinRoomByCode() {
+      setupUsername();
+      const inputCode = document.getElementById('inputRoomCode').value.trim();
+      if (!inputCode || inputCode.length !== 6) {
+        showToast('Please enter a valid 6-digit room code', 'error');
+        return;
+      }
+      currentRoomCode = inputCode.toUpperCase();
+      enterRoom(currentRoomCode);
+      showToast(`Joined Lounge Room #${currentRoomCode}`);
+
+      setTimeout(() => {
+        broadcastStateChange({
+          type: 'REQUEST_SYNC',
+          sender: username
+        });
+      }, 500);
+    }
+
+    function setupUsername() {
+      const inputVal = document.getElementById('inputUsername').value.trim();
+      username = inputVal || `User_${Math.floor(1000 + Math.random() * 9000)}`;
+      updateUsernameUI(username);
+    }
+
+    function updateUsernameUI(newName) {
+      username = newName;
+      document.getElementById('displayUsername').innerText = username;
+      document.getElementById('userAvatar').innerText = username.charAt(0).toUpperCase();
+      
+      const userAvatarBox = document.getElementById('userAvatarBox');
+      if (userAvatarBox) userAvatarBox.innerText = username.charAt(0).toUpperCase();
+      
+      const localAudioName = document.getElementById('localAudioName');
+      if (localAudioName) localAudioName.innerText = `${username} (You)`;
+    }
+
+    function toggleProfileModal() {
+      const modal = document.getElementById('profileModal');
+      const input = document.getElementById('editUsernameInput');
+      input.value = username;
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function saveProfileName() {
+      const inputVal = document.getElementById('editUsernameInput').value.trim();
+      if (!inputVal) {
+        showToast('Name cannot be empty', 'error');
+        return;
+      }
+      const oldName = username;
+      updateUsernameUI(inputVal);
+      toggleProfileModal();
+      showToast(`Updated name to ${username}`);
+
+      if (currentRoomCode) {
+        addSystemChatMessage(`${oldName} changed their name to ${username}.`);
+        broadcastStateChange({
+          type: 'CHAT',
+          sender: 'System',
+          text: `${oldName} changed their name to ${username}.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+      }
+    }
+
+    function enterRoom(code) {
+      document.getElementById('joinModal').classList.add('hidden');
+      document.getElementById('roomBadge').classList.remove('hidden');
+      document.getElementById('roomBadge').classList.add('flex');
+      document.getElementById('displayRoomCode').innerText = code;
+
+      if (channel) channel.close();
+      channel = new BroadcastChannel(`cinetheatre_room_${code}`);
+      channel.onmessage = handleSyncMessage;
+
+      startRoomAutoCleanupMonitor();
+      addSystemChatMessage(`${username} entered the lounge room #${code}.`);
+    }
+
+    function leaveRoom() {
+      stopRoomAutoCleanupMonitor();
+      if (channel) {
+        broadcastStateChange({
+          type: 'CHAT',
+          sender: 'System',
+          text: `${username} left the room.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        channel.close();
+      }
+      channel = null;
+      currentRoomCode = null;
+
+      document.getElementById('roomBadge').classList.add('hidden');
+      document.getElementById('roomBadge').classList.remove('flex');
+      document.getElementById('joinModal').classList.remove('hidden');
+
+      showToast('Left the lounge room');
+    }
+
+    function copyRoomCode() {
+      if (!currentRoomCode) return;
+      const tempInput = document.createElement('input');
+      tempInput.value = currentRoomCode;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      showToast(`Copied room code: ${currentRoomCode}`);
+    }
+
+    function broadcastStateChange(data) {
+      if (!channel) return;
+      channel.postMessage(data);
+    }
+
+    // Mobile View Toggle
+    function toggleMobileView() {
+      const sideSection = document.getElementById('sideSection');
+      const videoSection = document.getElementById('videoSection');
+      const toggleBtnLabel = document.getElementById('mobileTabLabel');
+
+      isMobileChatOpen = !isMobileChatOpen;
+
+      if (isMobileChatOpen) {
+        sideSection.classList.remove('hidden');
+        sideSection.classList.add('flex', 'w-full');
+        videoSection.classList.add('hidden');
+        toggleBtnLabel.innerText = "Theater Screen";
+      } else {
+        sideSection.classList.add('hidden');
+        sideSection.classList.remove('flex', 'w-full');
+        videoSection.classList.remove('hidden');
+        toggleBtnLabel.innerText = "Chat & Call";
+      }
+    }
+
+    // Central Broadcast & Message Handler
+    function handleSyncMessage(event) {
+      const data = event.data;
+      if (data.sender === username) return;
+
+      recordRoomActivity();
+      isBroadcastingInternal = true;
+      triggerSyncIndicator(`Syncing with ${data.sender}`);
+
+      switch (data.type) {
+        case 'PLAY':
+          mainVideo.currentTime = data.currentTime;
+          mainVideo.play().catch(() => {});
+          addSystemChatMessage(`${data.sender} played the video.`);
+          break;
+        case 'PAUSE':
+          mainVideo.currentTime = data.currentTime;
+          mainVideo.pause();
+          addSystemChatMessage(`${data.sender} paused the video.`);
+          break;
+        case 'SEEK':
+          mainVideo.currentTime = data.currentTime;
+          addSystemChatMessage(`${data.sender} jumped to timestamp ${formatTime(data.currentTime)}.`);
+          break;
+        case 'CHANGE_SRC':
+          setMediaSource(data.src, data.title);
+          addSystemChatMessage(`${data.sender} changed movie to "${data.title}".`);
+          break;
+        case 'START_LIVE_STREAM':
+          addSystemChatMessage(`${data.sender} started sharing local movie stream "${data.title}". Connecting...`);
+          requestP2PStreamConnection(data.sender);
+          break;
+        case 'WEBRTC_OFFER':
+          handleWebRTCOffer(data);
+          break;
+        case 'WEBRTC_ANSWER':
+          handleWebRTCAnswer(data);
+          break;
+        case 'WEBRTC_ICE':
+          handleWebRTCIce(data);
+          break;
+        case 'CHAT':
+          renderChatMessage(data.sender, data.text, data.timestamp);
+          break;
+        case 'ROOM_DELETED':
+          showToast(`Room was closed by system auto-cleanup`, 'error');
+          leaveRoom();
+          break;
+        case 'REQUEST_SYNC':
+          const ytPlayer = document.getElementById('ytPlayer');
+          const currentSrc = ytPlayer && !ytPlayer.classList.contains('hidden') ? ytPlayer.src : mainVideo.src;
+          broadcastStateChange({
+            type: 'CHANGE_SRC',
+            src: currentSrc,
+            title: document.getElementById('currentMovieTitle').innerText,
+            sender: username
+          });
+          if (!mainVideo.paused) {
+            broadcastStateChange({
+              type: 'PLAY',
+              currentTime: mainVideo.currentTime,
+              sender: username
+            });
+          }
+          break;
+      }
+
+      setTimeout(() => { isBroadcastingInternal = false; }, 300);
+    }
+
+    // WebRTC Peer Connection Methods for P2P Broadcast
+    function requestP2PStreamConnection(hostName) {
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnections[hostName] = pc;
+
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          mainVideo.src = "";
+          mainVideo.srcObject = event.streams[0];
+          mainVideo.play().catch(() => {});
+          showToast(`Connected to live stream from ${hostName}!`);
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          broadcastStateChange({
+            type: 'WEBRTC_ICE',
+            candidate: event.candidate,
+            target: hostName,
+            sender: username
+          });
+        }
+      };
+
+      pc.createOffer().then(offer => {
+        pc.setLocalDescription(offer);
+        broadcastStateChange({
+          type: 'WEBRTC_OFFER',
+          offer: offer,
+          target: hostName,
+          sender: username
+        });
+      });
+    }
+
+    function handleWebRTCOffer(data) {
+      if (!isStreamHost) return;
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnections[data.sender] = pc;
+
+      if (localFileStream) {
+        localFileStream.getTracks().forEach(track => pc.addTrack(track, localFileStream));
+      }
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          broadcastStateChange({
+            type: 'WEBRTC_ICE',
+            candidate: event.candidate,
+            target: data.sender,
+            sender: username
+          });
+        }
+      };
+
+      pc.setRemoteDescription(new RTCSessionDescription(data.offer)).then(() => {
+        return pc.createAnswer();
+      }).then(answer => {
+        pc.setLocalDescription(answer);
+        broadcastStateChange({
+          type: 'WEBRTC_ANSWER',
+          answer: answer,
+          target: data.sender,
+          sender: username
+        });
+      });
+    }
+
+    function handleWebRTCAnswer(data) {
+      const pc = peerConnections[data.sender];
+      if (pc) {
+        pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    }
+
+    function handleWebRTCIce(data) {
+      const pc = peerConnections[data.sender];
+      if (pc && data.candidate) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
+      }
+    }
+
+    // Media & File Handling Logic
+    function triggerSyncIndicator(msg) {
+      const badge = document.getElementById('syncBadge');
+      document.getElementById('syncStatusText').innerText = msg;
+      badge.classList.remove('opacity-0');
+      setTimeout(() => {
+        badge.classList.add('opacity-0');
+      }, 2000);
+    }
+
+    function extractYouTubeId(url) {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function setMediaSource(url, title = "Custom Video") {
+      const ytId = extractYouTubeId(url);
+      const ytPlayer = document.getElementById('ytPlayer');
+
+      if (ytId) {
+        mainVideo.pause();
+        mainVideo.src = "";
+        mainVideo.srcObject = null;
+        mainVideo.classList.add('hidden');
+
+        ytPlayer.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&enablejsapi=1`;
+        ytPlayer.classList.remove('hidden');
+        document.getElementById('currentMovieTitle').innerText = title.includes("YouTube") ? title : `YouTube: ${title}`;
+      } else {
+        ytPlayer.src = "";
+        ytPlayer.classList.add('hidden');
+
+        mainVideo.classList.remove('hidden');
+        mainVideo.srcObject = null;
+        mainVideo.src = url;
+        mainVideo.play().catch(() => {});
+        document.getElementById('currentMovieTitle').innerText = title;
+      }
+    }
+
+    function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fileURL = URL.createObjectURL(file);
+      setMediaSource(fileURL, `[Host Stream] ${file.name}`);
+      showToast(`Broadcasting "${file.name}" to room members...`);
+      isStreamHost = true;
+
+      if (mainVideo.captureStream) {
+        localFileStream = mainVideo.captureStream();
+      } else if (mainVideo.mozCaptureStream) {
+        localFileStream = mainVideo.mozCaptureStream();
+      }
+
+      broadcastStateChange({
+        type: 'START_LIVE_STREAM',
+        title: file.name,
+        sender: username
+      });
+    }
+
+    function loadCustomUrl() {
+      const url = document.getElementById('videoUrlInput').value.trim();
+      if (!url) {
+        showToast('Please paste a valid video or YouTube URL', 'error');
+        return;
+      }
+
+      const ytId = extractYouTubeId(url);
+      const titleName = ytId ? `YouTube Video (${ytId})` : "Custom Stream Video";
+
+      setMediaSource(url, titleName);
+      showToast(ytId ? 'YouTube video loaded!' : 'Custom video loaded!');
+
+      broadcastStateChange({
+        type: 'CHANGE_SRC',
+        src: url,
+        title: titleName,
+        sender: username
+      });
+
+      document.getElementById('videoUrlInput').value = '';
+    }
+
+    // Modal Handlers
+    function toggleCatalogModal() {
+      const modal = document.getElementById('catalogModal');
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function selectPresetMovie(title, url) {
+      setMediaSource(url, title);
+      toggleCatalogModal();
+      showToast(`Selected "${title}"`);
+
+      broadcastStateChange({
+        type: 'CHANGE_SRC',
+        src: url,
+        title: title,
+        sender: username
+      });
+    }
+
+    // Chat Logic
+    function sendChatMessage(e) {
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      renderChatMessage(username, text, timestamp, true);
+
+      broadcastStateChange({
+        type: 'CHAT',
+        sender: username,
+        text: text,
+        timestamp: timestamp
+      });
+
+      input.value = '';
+    }
+
+    function renderChatMessage(sender, text, timestamp, isSelf = false) {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = isSelf 
+        ? "bg-cyan-950/60 border border-cyan-800/50 rounded-xl p-2.5 ml-4"
+        : "bg-theater-850 border border-slate-800 rounded-xl p-2.5 mr-4";
+
+      const escapedText = escapeHTML(text);
+      const escapedSender = escapeHTML(sender);
+
+      msgDiv.innerHTML = `
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-bold text-[11px] ${isSelf ? 'text-cyan-400' : 'text-amber-400'}">${escapedSender}</span>
+          <span class="text-[9px] text-slate-500">${timestamp}</span>
+        </div>
+        <p class="text-slate-200 text-xs break-words">${escapedText}</p>
+      `;
+
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addSystemChatMessage(text) {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+
+      const sysDiv = document.createElement('div');
+      sysDiv.className = "bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5 text-slate-400 text-[11px]";
+      sysDiv.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i> ${escapeHTML(text)}`;
+
+      container.appendChild(sysDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Voice Chat Controls
+    async function toggleMic() {
+      isMicOn = !isMicOn;
+      const btn = document.getElementById('toggleMicBtn');
+      const iconStatus = document.getElementById('selfMicStatus');
+      const micLabel = document.getElementById('selfMicLabel');
+
+      if (isMicOn) {
+        btn.classList.replace('bg-slate-800', 'bg-emerald-600');
+        btn.classList.replace('hover:bg-slate-700', 'hover:bg-emerald-500');
+        btn.innerHTML = `<i class="fa-solid fa-microphone text-white"></i> <span>Mute Mic</span>`;
+        iconStatus.className = "w-6 h-6 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full flex items-center justify-center text-[10px] shrink-0 animate-pulse";
+        iconStatus.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+        micLabel.innerText = "Speaking...";
+        micLabel.className = "text-[10px] text-emerald-400 font-medium";
+        showToast('Microphone Unmuted');
+      } else {
+        btn.classList.replace('bg-emerald-600', 'bg-slate-800');
+        btn.classList.replace('hover:bg-emerald-500', 'hover:bg-slate-700');
+        btn.innerHTML = `<i class="fa-solid fa-microphone-slash text-rose-400"></i> <span>Unmute Mic</span>`;
+        iconStatus.className = "w-6 h-6 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full flex items-center justify-center text-[10px] shrink-0";
+        iconStatus.innerHTML = `<i class="fa-solid fa-microphone-slash"></i>`;
+        micLabel.innerText = "Muted";
+        micLabel.className = "text-[10px] text-slate-500";
+        showToast('Microphone Muted');
+      }
+      initAudioStream();
+    }
+
+    async function initAudioStream() {
+      if (!isMicOn) {
+        if (localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+          localStream = null;
+        }
+        return;
+      }
+
+      try {
+        if (!localStream) {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false
+          });
+        }
+        localStream.getAudioTracks().forEach(t => t.enabled = isMicOn);
+      } catch (err) {
+        showToast("Microphone permission denied or inactive", "error");
+      }
+    }
+
+    function simulateAddPeer() {
+      const names = ["Sarah", "David", "Elena", "Liam", "Sophia"];
+      const peerName = names[Math.floor(Math.random() * names.length)];
+      
+      const grid = document.getElementById('voiceGrid');
+      const peerId = `peer_${Date.now()}`;
+
+      const peerBox = document.createElement('div');
+      peerBox.id = peerId;
+      peerBox.className = "relative bg-theater-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center space-x-2.5";
+      peerBox.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-amber-600/90 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
+          ${peerName.charAt(0)}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-semibold text-slate-200 truncate">${peerName}</p>
+          <p class="text-[10px] text-emerald-400 font-medium">Connected</p>
+        </div>
+        <button onclick="removePeer('${peerId}')" class="w-5 h-5 bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-rose-300 rounded-full flex items-center justify-center text-[10px] shrink-0 transition" title="Disconnect participant">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      `;
+
+      grid.appendChild(peerBox);
+      simulatedPeers.push(peerName);
+      updateParticipantCount();
+      addSystemChatMessage(`${peerName} connected to voice chat.`);
+      showToast(`${peerName} joined the voice lounge!`);
+    }
+
+    function removePeer(peerId) {
+      const elem = document.getElementById(peerId);
+      if (elem) elem.remove();
+      simulatedPeers.pop();
+      updateParticipantCount();
+    }
+
+    function updateParticipantCount() {
+      const count = 1 + simulatedPeers.length;
+      document.getElementById('participantCount').innerText = `${count} Connected`;
+    }
+
+    // Utilities
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = msg;
+      if (type === 'error') {
+        toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400';
+      } else {
+        toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+  </script>
+</body>
+</html>
